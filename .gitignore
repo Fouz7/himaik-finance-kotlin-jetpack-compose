@@ -1,0 +1,46 @@
+# Android & Gradle
+.gradle/
+**/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+
+# Local configuration (machine-specific)
+local.properties
+keystore.properties
+
+# IDE files
+*.iml
+.idea/
+.vscode/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+$RECYCLE.BIN/
+Desktop.ini
+
+# Packages / Artifacts
+*.apk
+*.ap_
+*.aab
+
+# Logs & dumps
+*.log
+*.hprof
+
+# NDK / obj
+**/obj/
+
+# Keystores & keys (never commit signing secrets)
+*.jks
+*.keystore
+*.pem
+*.key
+
+# Kotlin/Java compiled classes (normally inside build/ but safe to ignore)
+**/*.class
+
+# Misc
+# Generated navigation/data binding JSON are under build/ and covered above
+
