@@ -1,8 +1,6 @@
 package com.example.himaikfinance.ui.theme
 
-import android.app.Activity
 import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -14,7 +12,8 @@ import androidx.compose.ui.platform.LocalContext
 private val DarkColorScheme = darkColorScheme(
     primary = himaikPrimary,
     secondary = himaikSecondaryBackground,
-    tertiary = himaikPrimaryText
+    tertiary = himaikPrimaryText,
+    surface = himaikSurface
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -22,6 +21,7 @@ private val LightColorScheme = lightColorScheme(
     secondary = himaikSecondaryBackground,
     tertiary = himaikPrimaryText,
     background = himaikBackground,
+    surface = himaikSurface,
     /* Other default colors to override
     background = Color(0xFFFFFBFE),
     surface = Color(0xFFFFFBFE),

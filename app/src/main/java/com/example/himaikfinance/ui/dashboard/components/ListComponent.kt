@@ -54,7 +54,9 @@ import kotlin.math.sin
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.runtime.LaunchedEffect
-import kotlinx.coroutines.flow.collect
+import com.example.himaikfinance.ui.theme.himaikSurface
+import com.example.himaikfinance.ui.theme.himaikIncomeColor
+import com.example.himaikfinance.ui.theme.himaikOutcomeColor
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalFoundationApi::class)
@@ -73,7 +75,7 @@ fun ListComponent(
         }
     }
 
-    val mainBackground = Color(0xFF765E41)
+    val mainBackground = MaterialTheme.colorScheme.surface
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -186,7 +188,7 @@ private fun PagedListIncome(
             RoundedPolygonLoader(
                 diameter = 64.dp,
                 sides = 6,
-                color = Color(0xFF765E41),
+                color = MaterialTheme.colorScheme.surface,
                 cornerRadius = 12.dp
             )
         }
@@ -245,7 +247,7 @@ private fun PagedListTransaction(
             RoundedPolygonLoader(
                 diameter = 64.dp,
                 sides = 6,
-                color = Color(0xFF765E41),
+                color = MaterialTheme.colorScheme.surface,
                 cornerRadius = 12.dp
             )
         }
@@ -325,7 +327,7 @@ private fun IncomeItem(name: String, transferDate: String, nominalText: String) 
         Text(
             text = nominalText,
             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-            color = Color(0xFF267A0A),
+            color = himaikIncomeColor,
             textAlign = TextAlign.End,
             maxLines = 1,
             overflow = TextOverflow.Clip
@@ -340,7 +342,7 @@ private fun TransactionItem(
     amountText: String,
     isDebit: Boolean
 ) {
-    val amountColor = if (isDebit) Color(0xFFA42222) else Color(0xFF267A0A)
+    val amountColor = if (isDebit) himaikOutcomeColor else himaikIncomeColor
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -441,7 +443,7 @@ private fun RoundedPolygonLoader(
     modifier: Modifier = Modifier,
     diameter: Dp = 64.dp,
     sides: Int = 6,
-    color: Color = Color(0xFF765E41),
+    color: Color = himaikSurface,
     cornerRadius: Dp = 12.dp,
     durationMillis: Int = 1200
 ) {

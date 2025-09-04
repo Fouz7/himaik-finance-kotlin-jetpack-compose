@@ -3,7 +3,6 @@ package com.example.himaikfinance.ui.dashboard.components
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.AddCircle
@@ -17,7 +16,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 
@@ -71,7 +69,7 @@ fun FloatingBottomBar(
                         .height(controlSize)
                         .width(bgTargetWidth),
                     shape = MaterialTheme.shapes.extraLarge,
-                    color = Color(0xFF765E41),
+                    color = MaterialTheme.colorScheme.surface,
                     tonalElevation = 2.dp
                 ) {
                     if (expanded) {

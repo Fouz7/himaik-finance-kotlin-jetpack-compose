@@ -1,9 +1,11 @@
 # Android & Gradle
 .gradle/
 **/build/
-/captures/
+captures/
 .externalNativeBuild/
+externalNativeBuild/
 .cxx/
+.kotlin/
 
 # Local configuration (machine-specific)
 local.properties
@@ -13,6 +15,7 @@ keystore.properties
 *.iml
 .idea/
 .vscode/
+out/
 
 # OS-specific
 .DS_Store
@@ -43,4 +46,3 @@ Desktop.ini
 
 # Misc
 # Generated navigation/data binding JSON are under build/ and covered above
-
