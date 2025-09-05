@@ -6,6 +6,7 @@ import com.example.himaikfinance.data.model.LoginRequest
 import com.example.himaikfinance.data.remote.RetrofitClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import retrofit2.HttpException
 
 class AuthRepository(
     private val tokenManager: TokenManager,
@@ -32,7 +33,8 @@ class AuthRepository(
 
                     Result.success(Unit)
                 } else {
-                    Result.failure(Exception(resp.body()?.message))
+                    // Propagate as HttpException so upper layers can parse errorBody
+                    Result.failure(HttpException(resp))
                 }
             } catch (e: Exception) {
                 Result.failure(e)

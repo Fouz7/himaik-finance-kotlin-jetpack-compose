@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import retrofit2.HttpException
+import java.io.IOException
 
 sealed interface LoginUiState {
     object Idle: LoginUiState
@@ -31,14 +32,8 @@ class LoginViewModel(
                 onSuccess = { LoginUiState.Success },
                 onFailure = { e ->
                     val message = when (e) {
-                        is HttpException -> {
-                            val raw = e.response()?.errorBody()?.string()
-                            try {
-                                JSONObject(raw ?: "").optString("message", e.message())
-                            } catch (_: Exception) {
-                                e.message() ?: "Unexpected error"
-                            }
-                        }
+                        is HttpException -> parseHttpError(e)
+                        is IOException -> "Network error. Please check your connection."
                         else -> e.message ?: "Unexpected error"
                     }
                     LoginUiState.Error(message)
@@ -46,5 +41,40 @@ class LoginViewModel(
             )
         }
     }
-}
 
+    private fun parseHttpError(e: HttpException): String {
+        val code = e.code()
+        val raw = try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
+        if (raw.isNullOrBlank()) return "Login failed (code $code)"
+        return try {
+            val json = JSONObject(raw)
+            when {
+                json.optString("message").isNotBlank() -> json.optString("message")
+                json.optString("error").isNotBlank() -> json.optString("error")
+                json.has("errors") -> {
+                    val errors = json.get("errors")
+                    when (errors) {
+                        is JSONObject -> buildString {
+                            val keys = errors.keys()
+                            while (keys.hasNext()) {
+                                val k = keys.next()
+                                val v = errors.optJSONArray(k)
+                                if (v != null && v.length() > 0) {
+                                    append(v.getString(0))
+                                } else {
+                                    append(errors.optString(k))
+                                }
+                                if (keys.hasNext()) append('\n')
+                            }
+                        }
+                        else -> errors.toString()
+                    }
+                }
+                json.optString("detail").isNotBlank() -> json.optString("detail")
+                else -> "Login failed (code $code)"
+            }
+        } catch (_: Exception) {
+            e.message() ?: "Login failed (code $code)"
+        }
+    }
+}
