@@ -58,6 +58,8 @@ import kotlin.math.min
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.content.edit
 
+private enum class MenuAction { Theme, Logout }
+
 class DashboardActivity : ComponentActivity() {
 
     private val tokenManager: TokenManager by lazy { TokenManager(applicationContext) }
@@ -76,16 +78,17 @@ class DashboardActivity : ComponentActivity() {
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
+        fun persistTheme(t: AppTheme) {
+            getSharedPreferences("session", Context.MODE_PRIVATE)
+                .edit { putString("appTheme", t.name) }
+        }
+
         setContent {
             val ctx = LocalContext.current
             var appTheme by rememberSaveable {
                 val saved = ctx.getSharedPreferences("session", Context.MODE_PRIVATE)
                     .getString("appTheme", AppTheme.HIMAIK.name)
                 mutableStateOf(if (saved == AppTheme.BASIC.name) AppTheme.BASIC else AppTheme.HIMAIK)
-            }
-            fun persistTheme(t: AppTheme) {
-                ctx.getSharedPreferences("session", Context.MODE_PRIVATE)
-                    .edit { putString("appTheme", t.name) }
             }
 
             HIMAIKFinanceTheme(theme = appTheme, darkTheme = false, dynamicColor = false) {
@@ -229,7 +232,12 @@ private fun DashboardScreen(
                 totalIncome = totalIncome,
                 totalOutcome = totalOutcome,
                 evidenceUrl = evidenceUrl,
-                onRequestMenu = { showThemeChooser = it == "theme"; if (it == "logout") showLogoutConfirm = true }
+                onRequestMenu = { action ->
+                    when (action) {
+                        MenuAction.Theme -> showThemeChooser = true
+                        MenuAction.Logout -> showLogoutConfirm = true
+                    }
+                }
             )
         }
 
@@ -376,7 +384,7 @@ private fun DashboardBody(
     totalIncome: String,
     totalOutcome: String,
     evidenceUrl: String?,
-    onRequestMenu: (String) -> Unit
+    onRequestMenu: (MenuAction) -> Unit
 ) {
     when (selected) {
         0 -> Column(
@@ -418,11 +426,11 @@ private fun DashboardBody(
                             ) {
                                 DropdownMenuItem(
                                     text = { Text("Theme") },
-                                    onClick = { expanded = false; onRequestMenu("theme") }
+                                    onClick = { expanded = false; onRequestMenu(MenuAction.Theme) }
                                 )
                                 DropdownMenuItem(
                                     text = { Text("Logout") },
-                                    onClick = { expanded = false; onRequestMenu("logout") }
+                                    onClick = { expanded = false; onRequestMenu(MenuAction.Logout) }
                                 )
                             }
                         }
