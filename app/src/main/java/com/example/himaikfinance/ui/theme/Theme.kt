@@ -49,7 +49,7 @@ fun HIMAIKFinanceTheme(
         }
         else -> when (theme) {
             AppTheme.HIMAIK -> if (darkTheme) DarkColorScheme else LightColorScheme
-            AppTheme.BASIC -> BasicLightColorScheme
+            AppTheme.BASIC -> if (darkTheme) DarkColorScheme else BasicLightColorScheme
         }
     }
 

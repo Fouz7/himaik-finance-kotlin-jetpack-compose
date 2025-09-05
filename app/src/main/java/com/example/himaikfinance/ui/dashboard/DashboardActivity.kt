@@ -71,11 +71,7 @@ class DashboardActivity : ComponentActivity() {
             transactionRepository = TransactionRepsitory(RetrofitClient.api, tokenManager)
         )
     }
-
-    private fun persistTheme(t: AppTheme) {
-        getSharedPreferences("session", Context.MODE_PRIVATE)
-            .edit { putString("appTheme", t.name) }
-    }
+    private val themeVm: ThemeViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -84,12 +80,7 @@ class DashboardActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         setContent {
-            val ctx = LocalContext.current
-            var appTheme by rememberSaveable {
-                val saved = ctx.getSharedPreferences("session", Context.MODE_PRIVATE)
-                    .getString("appTheme", AppTheme.HIMAIK.name)
-                mutableStateOf(if (saved == AppTheme.BASIC.name) AppTheme.BASIC else AppTheme.HIMAIK)
-            }
+            val appTheme by themeVm.theme.collectAsState()
 
             HIMAIKFinanceTheme(theme = appTheme, darkTheme = false, dynamicColor = false) {
                 val view = LocalView.current
@@ -115,10 +106,7 @@ class DashboardActivity : ComponentActivity() {
                         tokenManager = tokenManager,
                         onLogout = { performLogout() },
                         currentTheme = appTheme,
-                        onChangeTheme = { t ->
-                            appTheme = t
-                            persistTheme(t)
-                        }
+                        onChangeTheme = { t -> themeVm.setTheme(t) }
                     )
                 }
             }
@@ -277,8 +265,8 @@ private fun DashboardScreen(
             )
         }
 
+        var selectedTheme by rememberSaveable { mutableStateOf(currentTheme) }
         if (showThemeChooser) {
-            var selectedTheme by rememberSaveable { mutableStateOf(currentTheme) }
             AlertDialog(
                 onDismissRequest = { showThemeChooser = false },
                 title = { Text("Select Theme", color = MaterialTheme.colorScheme.tertiary) },
