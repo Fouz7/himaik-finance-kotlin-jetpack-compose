@@ -50,15 +50,15 @@ import com.example.himaikfinance.ui.dashboard.components.QrDialog
 import com.example.himaikfinance.ui.dashboard.components.UploadEvidenceDialog
 import com.example.himaikfinance.ui.dashboard.components.CardComponent
 import com.example.himaikfinance.ui.dashboard.components.ListComponent
+import com.example.himaikfinance.ui.dashboard.components.OverflowMenu
 import com.example.himaikfinance.ui.login.LoginActivity
-import com.example.himaikfinance.ui.theme.AppTheme
+import com.example.himaikfinance.ui.enum.AppTheme
+import com.example.himaikfinance.ui.enum.MenuAction
 import com.example.himaikfinance.ui.theme.HIMAIKFinanceTheme
 import kotlinx.coroutines.launch
 import kotlin.math.min
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.content.edit
-
-private enum class MenuAction { Theme, Logout }
 
 class DashboardActivity : ComponentActivity() {
 
@@ -72,16 +72,16 @@ class DashboardActivity : ComponentActivity() {
         )
     }
 
+    private fun persistTheme(t: AppTheme) {
+        getSharedPreferences("session", Context.MODE_PRIVATE)
+            .edit { putString("appTheme", t.name) }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-
-        fun persistTheme(t: AppTheme) {
-            getSharedPreferences("session", Context.MODE_PRIVATE)
-                .edit { putString("appTheme", t.name) }
-        }
 
         setContent {
             val ctx = LocalContext.current
@@ -412,29 +412,11 @@ private fun DashboardBody(
                             tint = MaterialTheme.colorScheme.tertiary
                         )
                     }
-                    val parentScheme = MaterialTheme.colorScheme
-                    MaterialTheme(
-                        colorScheme = parentScheme.copy(surface = parentScheme.background),
-                        typography = MaterialTheme.typography,
-                        shapes = MaterialTheme.shapes
-                    ) {
-                        CompositionLocalProvider(LocalAbsoluteTonalElevation provides 0.dp) {
-                            DropdownMenu(
-                                expanded = expanded,
-                                onDismissRequest = { expanded = false },
-                                modifier = Modifier.background(MaterialTheme.colorScheme.background)
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text("Theme") },
-                                    onClick = { expanded = false; onRequestMenu(MenuAction.Theme) }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Logout") },
-                                    onClick = { expanded = false; onRequestMenu(MenuAction.Logout) }
-                                )
-                            }
-                        }
-                    }
+                    OverflowMenu(
+                        expanded = expanded,
+                        onDismiss = { expanded = false },
+                        onSelect = onRequestMenu
+                    )
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))

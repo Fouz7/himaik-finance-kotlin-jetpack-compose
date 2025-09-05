@@ -9,8 +9,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-
-enum class AppTheme { HIMAIK, BASIC }
+import com.example.himaikfinance.ui.enum.AppTheme
 
 private val DarkColorScheme = darkColorScheme(
     primary = himaikPrimary,
