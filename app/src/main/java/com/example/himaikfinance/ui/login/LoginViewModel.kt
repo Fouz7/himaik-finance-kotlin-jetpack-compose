@@ -11,15 +11,15 @@ import retrofit2.HttpException
 import java.io.IOException
 
 sealed interface LoginUiState {
-    object Idle: LoginUiState
-    object Loading: LoginUiState
-    object Success: LoginUiState
-    data class Error(val message: String): LoginUiState
+    object Idle : LoginUiState
+    object Loading : LoginUiState
+    object Success : LoginUiState
+    data class Error(val message: String) : LoginUiState
 }
 
 class LoginViewModel(
     private val repo: AuthRepository
-): ViewModel() {
+) : ViewModel() {
 
     private val _state = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
     val state: StateFlow<LoginUiState> = _state
@@ -44,7 +44,11 @@ class LoginViewModel(
 
     private fun parseHttpError(e: HttpException): String {
         val code = e.code()
-        val raw = try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
+        val raw = try {
+            e.response()?.errorBody()?.string()
+        } catch (_: Exception) {
+            null
+        }
         if (raw.isNullOrBlank()) return "Login failed (code $code)"
         return try {
             val json = JSONObject(raw)
@@ -52,24 +56,27 @@ class LoginViewModel(
                 json.optString("message").isNotBlank() -> json.optString("message")
                 json.optString("error").isNotBlank() -> json.optString("error")
                 json.has("errors") -> {
-                    val errors = json.get("errors")
+                    val errors = json.opt("errors")
                     when (errors) {
                         is JSONObject -> buildString {
                             val keys = errors.keys()
                             while (keys.hasNext()) {
                                 val k = keys.next()
                                 val v = errors.optJSONArray(k)
-                                if (v != null && v.length() > 0) {
-                                    append(v.getString(0))
+                                val first = v?.get(0)
+                                if (first is String) {
+                                    append(first)
                                 } else {
-                                    append(errors.optString(k))
+                                    append(first.toString())
                                 }
                                 if (keys.hasNext()) append('\n')
                             }
                         }
-                        else -> errors.toString()
+
+                        else -> errors?.toString() ?: "Login failed (code $code)"
                     }
                 }
+
                 json.optString("detail").isNotBlank() -> json.optString("detail")
                 else -> "Login failed (code $code)"
             }
