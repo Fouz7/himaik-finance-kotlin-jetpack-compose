@@ -58,20 +58,11 @@ class LoginViewModel(
                 json.has("errors") -> {
                     val errors = json.opt("errors")
                     when (errors) {
-                        is JSONObject -> buildString {
-                            val keys = errors.keys()
-                            while (keys.hasNext()) {
-                                val k = keys.next()
-                                val v = errors.optJSONArray(k) ?: continue
-                                val first = v.takeIf { it.length() > 0 }?.opt(0) ?: continue
-                                if (first is String) {
-                                    append(first)
-                                } else {
-                                    append(first.toString())
-                                }
-                                if (keys.hasNext()) append('\n')
-                            }
-                        }
+                        is JSONObject -> errors.keys().asSequence().mapNotNull { k ->
+                            val v = errors.optJSONArray(k) ?: return@mapNotNull null
+                            val first = v.takeIf { it.length() > 0 }?.opt(0) ?: return@mapNotNull null
+                            first as? String ?: first.toString()
+                        }.joinToString("\n")
 
                         else -> errors?.toString() ?: "Login failed (code $code)"
                     }
