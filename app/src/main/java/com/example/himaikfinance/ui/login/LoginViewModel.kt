@@ -62,8 +62,8 @@ class LoginViewModel(
                             val keys = errors.keys()
                             while (keys.hasNext()) {
                                 val k = keys.next()
-                                val v = errors.optJSONArray(k)
-                                val first = v?.get(0)
+                                val v = errors.optJSONArray(k) ?: continue
+                                val first = v.takeIf { it.length() > 0 }?.opt(0) ?: continue
                                 if (first is String) {
                                     append(first)
                                 } else {
