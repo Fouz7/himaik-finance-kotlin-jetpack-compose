@@ -15,7 +15,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Wallet
@@ -50,7 +50,10 @@ import com.example.himaikfinance.ui.dashboard.components.QrDialog
 import com.example.himaikfinance.ui.dashboard.components.UploadEvidenceDialog
 import com.example.himaikfinance.ui.dashboard.components.CardComponent
 import com.example.himaikfinance.ui.dashboard.components.ListComponent
+import com.example.himaikfinance.ui.dashboard.components.OverflowMenu
 import com.example.himaikfinance.ui.login.LoginActivity
+import com.example.himaikfinance.ui.enum.AppTheme
+import com.example.himaikfinance.ui.enum.MenuAction
 import com.example.himaikfinance.ui.theme.HIMAIKFinanceTheme
 import kotlinx.coroutines.launch
 import kotlin.math.min
@@ -68,6 +71,7 @@ class DashboardActivity : ComponentActivity() {
             transactionRepository = TransactionRepsitory(RetrofitClient.api, tokenManager)
         )
     }
+    private val themeVm: ThemeViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,7 +80,9 @@ class DashboardActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         setContent {
-            HIMAIKFinanceTheme(darkTheme = false, dynamicColor = false) {
+            val appTheme by themeVm.theme.collectAsState()
+
+            HIMAIKFinanceTheme(theme = appTheme, darkTheme = false, dynamicColor = false) {
                 val view = LocalView.current
                 val navColor = MaterialTheme.colorScheme.background
                 val notifColor = MaterialTheme.colorScheme.secondary
@@ -98,7 +104,9 @@ class DashboardActivity : ComponentActivity() {
                     DashboardScreen(
                         vm = vm,
                         tokenManager = tokenManager,
-                        onLogout = { performLogout() }
+                        onLogout = { performLogout() },
+                        currentTheme = appTheme,
+                        onChangeTheme = { t -> themeVm.setTheme(t) }
                     )
                 }
             }
@@ -122,7 +130,9 @@ class DashboardActivity : ComponentActivity() {
 private fun DashboardScreen(
     vm: DashboardViewModel,
     tokenManager: TokenManager,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    currentTheme: AppTheme,
+    onChangeTheme: (AppTheme) -> Unit
 ) {
     LaunchedEffect(Unit) {
         vm.loadBalanceEvidence()
@@ -173,6 +183,7 @@ private fun DashboardScreen(
     }
 
     var showLogoutConfirm by rememberSaveable { mutableStateOf(false) }
+    var showThemeChooser by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.secondary,
@@ -209,7 +220,12 @@ private fun DashboardScreen(
                 totalIncome = totalIncome,
                 totalOutcome = totalOutcome,
                 evidenceUrl = evidenceUrl,
-                onRequestLogout = { showLogoutConfirm = true }
+                onRequestMenu = { action ->
+                    when (action) {
+                        MenuAction.Theme -> showThemeChooser = true
+                        MenuAction.Logout -> showLogoutConfirm = true
+                    }
+                }
             )
         }
 
@@ -246,6 +262,56 @@ private fun DashboardScreen(
                 onDismiss = { activeDialog = null },
                 dismissSignal = dismissSignal,
                 pivotX = pivotX
+            )
+        }
+
+        var selectedTheme by rememberSaveable { mutableStateOf(currentTheme) }
+        if (showThemeChooser) {
+            AlertDialog(
+                onDismissRequest = { showThemeChooser = false },
+                title = { Text("Select Theme", color = MaterialTheme.colorScheme.tertiary) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = selectedTheme == AppTheme.HIMAIK,
+                                onClick = { selectedTheme = AppTheme.HIMAIK },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = MaterialTheme.colorScheme.surface
+                                )
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("HIMAIK", color = MaterialTheme.colorScheme.tertiary)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = selectedTheme == AppTheme.BASIC,
+                                onClick = { selectedTheme = AppTheme.BASIC },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = MaterialTheme.colorScheme.surface
+                                )
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Basic", color = MaterialTheme.colorScheme.tertiary)
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            onChangeTheme(selectedTheme)
+                            showThemeChooser = false
+                        },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)
+                    ) { Text("Apply") }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showThemeChooser = false },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)
+                    ) { Text("Cancel") }
+                },
+                containerColor = MaterialTheme.colorScheme.primary
             )
         }
 
@@ -306,7 +372,7 @@ private fun DashboardBody(
     totalIncome: String,
     totalOutcome: String,
     evidenceUrl: String?,
-    onRequestLogout: () -> Unit
+    onRequestMenu: (MenuAction) -> Unit
 ) {
     when (selected) {
         0 -> Column(
@@ -319,11 +385,25 @@ private fun DashboardBody(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "Hello, $username")
-                IconButton(onClick = onRequestLogout) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.Logout,
-                        contentDescription = "Logout"
+                Text(
+                    text = "Hello, $username",
+                    color = MaterialTheme.colorScheme.tertiary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+                Box {
+                    var expanded by remember { mutableStateOf(false) }
+                    IconButton(onClick = { expanded = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.MoreVert,
+                            contentDescription = "Menu",
+                            tint = MaterialTheme.colorScheme.tertiary
+                        )
+                    }
+                    OverflowMenu(
+                        expanded = expanded,
+                        onDismiss = { expanded = false },
+                        onSelect = onRequestMenu
                     )
                 }
             }

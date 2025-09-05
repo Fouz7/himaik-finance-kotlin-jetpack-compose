@@ -7,7 +7,9 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import com.example.himaikfinance.ui.enum.AppTheme
 
 private val DarkColorScheme = darkColorScheme(
     primary = himaikPrimary,
@@ -22,32 +24,33 @@ private val LightColorScheme = lightColorScheme(
     tertiary = himaikPrimaryText,
     background = himaikBackground,
     surface = himaikSurface,
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+)
+
+private val BasicLightColorScheme = lightColorScheme(
+    primary = Color(0xFFFFFFFF),
+    background = Color(0xFFFFFFFF),
+    secondary = Color(0xFFE5E5E5),
+    tertiary = Color(0xFF000000),
+    surface = Color(0xFF14213D)
 )
 
 @Composable
 fun HIMAIKFinanceTheme(
+    theme: AppTheme = AppTheme.HIMAIK,
     darkTheme: Boolean = false,
-    // Dynamic color is available on Android 12+
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
+    val context = LocalContext.current
+
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+        else -> when (theme) {
+            AppTheme.HIMAIK -> if (darkTheme) DarkColorScheme else LightColorScheme
+            AppTheme.BASIC -> if (darkTheme) DarkColorScheme else BasicLightColorScheme
+        }
     }
 
     MaterialTheme(
