@@ -15,7 +15,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Wallet
@@ -51,6 +51,7 @@ import com.example.himaikfinance.ui.dashboard.components.UploadEvidenceDialog
 import com.example.himaikfinance.ui.dashboard.components.CardComponent
 import com.example.himaikfinance.ui.dashboard.components.ListComponent
 import com.example.himaikfinance.ui.login.LoginActivity
+import com.example.himaikfinance.ui.theme.AppTheme
 import com.example.himaikfinance.ui.theme.HIMAIKFinanceTheme
 import kotlinx.coroutines.launch
 import kotlin.math.min
@@ -76,7 +77,18 @@ class DashboardActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         setContent {
-            HIMAIKFinanceTheme(darkTheme = false, dynamicColor = false) {
+            val ctx = LocalContext.current
+            var appTheme by rememberSaveable {
+                val saved = ctx.getSharedPreferences("session", Context.MODE_PRIVATE)
+                    .getString("appTheme", AppTheme.HIMAIK.name)
+                mutableStateOf(if (saved == AppTheme.BASIC.name) AppTheme.BASIC else AppTheme.HIMAIK)
+            }
+            fun persistTheme(t: AppTheme) {
+                ctx.getSharedPreferences("session", Context.MODE_PRIVATE)
+                    .edit { putString("appTheme", t.name) }
+            }
+
+            HIMAIKFinanceTheme(theme = appTheme, darkTheme = false, dynamicColor = false) {
                 val view = LocalView.current
                 val navColor = MaterialTheme.colorScheme.background
                 val notifColor = MaterialTheme.colorScheme.secondary
@@ -98,7 +110,12 @@ class DashboardActivity : ComponentActivity() {
                     DashboardScreen(
                         vm = vm,
                         tokenManager = tokenManager,
-                        onLogout = { performLogout() }
+                        onLogout = { performLogout() },
+                        currentTheme = appTheme,
+                        onChangeTheme = { t ->
+                            appTheme = t
+                            persistTheme(t)
+                        }
                     )
                 }
             }
@@ -122,7 +139,9 @@ class DashboardActivity : ComponentActivity() {
 private fun DashboardScreen(
     vm: DashboardViewModel,
     tokenManager: TokenManager,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    currentTheme: AppTheme,
+    onChangeTheme: (AppTheme) -> Unit
 ) {
     LaunchedEffect(Unit) {
         vm.loadBalanceEvidence()
@@ -173,6 +192,7 @@ private fun DashboardScreen(
     }
 
     var showLogoutConfirm by rememberSaveable { mutableStateOf(false) }
+    var showThemeChooser by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.secondary,
@@ -209,7 +229,7 @@ private fun DashboardScreen(
                 totalIncome = totalIncome,
                 totalOutcome = totalOutcome,
                 evidenceUrl = evidenceUrl,
-                onRequestLogout = { showLogoutConfirm = true }
+                onRequestMenu = { showThemeChooser = it == "theme"; if (it == "logout") showLogoutConfirm = true }
             )
         }
 
@@ -246,6 +266,56 @@ private fun DashboardScreen(
                 onDismiss = { activeDialog = null },
                 dismissSignal = dismissSignal,
                 pivotX = pivotX
+            )
+        }
+
+        if (showThemeChooser) {
+            var selectedTheme by rememberSaveable { mutableStateOf(currentTheme) }
+            AlertDialog(
+                onDismissRequest = { showThemeChooser = false },
+                title = { Text("Select Theme", color = MaterialTheme.colorScheme.tertiary) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = selectedTheme == AppTheme.HIMAIK,
+                                onClick = { selectedTheme = AppTheme.HIMAIK },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = MaterialTheme.colorScheme.surface
+                                )
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("HIMAIK", color = MaterialTheme.colorScheme.tertiary)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = selectedTheme == AppTheme.BASIC,
+                                onClick = { selectedTheme = AppTheme.BASIC },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = MaterialTheme.colorScheme.surface
+                                )
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Basic", color = MaterialTheme.colorScheme.tertiary)
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            onChangeTheme(selectedTheme)
+                            showThemeChooser = false
+                        },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)
+                    ) { Text("Apply") }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showThemeChooser = false },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)
+                    ) { Text("Cancel") }
+                },
+                containerColor = MaterialTheme.colorScheme.primary
             )
         }
 
@@ -306,7 +376,7 @@ private fun DashboardBody(
     totalIncome: String,
     totalOutcome: String,
     evidenceUrl: String?,
-    onRequestLogout: () -> Unit
+    onRequestMenu: (String) -> Unit
 ) {
     when (selected) {
         0 -> Column(
@@ -319,12 +389,44 @@ private fun DashboardBody(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "Hello, $username")
-                IconButton(onClick = onRequestLogout) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.Logout,
-                        contentDescription = "Logout"
-                    )
+                Text(
+                    text = "Hello, $username",
+                    color = MaterialTheme.colorScheme.tertiary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+                Box {
+                    var expanded by remember { mutableStateOf(false) }
+                    IconButton(onClick = { expanded = true }) {
+                        Icon(
+                            imageVector = Icons.Filled.MoreVert,
+                            contentDescription = "Menu",
+                            tint = MaterialTheme.colorScheme.tertiary
+                        )
+                    }
+                    val parentScheme = MaterialTheme.colorScheme
+                    MaterialTheme(
+                        colorScheme = parentScheme.copy(surface = parentScheme.background),
+                        typography = MaterialTheme.typography,
+                        shapes = MaterialTheme.shapes
+                    ) {
+                        CompositionLocalProvider(LocalAbsoluteTonalElevation provides 0.dp) {
+                            DropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false },
+                                modifier = Modifier.background(MaterialTheme.colorScheme.background)
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Theme") },
+                                    onClick = { expanded = false; onRequestMenu("theme") }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Logout") },
+                                    onClick = { expanded = false; onRequestMenu("logout") }
+                                )
+                            }
+                        }
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(12.dp))
