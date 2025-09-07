@@ -19,6 +19,7 @@ import java.text.DecimalFormatSymbols
 import java.util.Locale
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.collectLatest
 
 class DashboardViewModel(
     initialUsername: String,
@@ -41,45 +42,57 @@ class DashboardViewModel(
     val refreshLists = _refreshLists.asSharedFlow()
 
     val incomePaging: Flow<PagingData<IncomeData>> =
-        incomeRepository.incomePager().flow.cachedIn(viewModelScope)
+        incomeRepository.incomePagingFlow().cachedIn(viewModelScope)
 
     val transactionPaging: Flow<PagingData<TransactionData>> =
-        transactionRepository.transactionPager().flow.cachedIn(viewModelScope)
+        transactionRepository.transactionPagingFlow().cachedIn(viewModelScope)
 
     init {
+        viewModelScope.launch {
+            balanceRepository.observeTotals().collectLatest { totals ->
+                if (totals != null) {
+                    _totalBalanceText.value = formatRupiah(totals.balance)
+                    _totalIncomeText.value = formatRupiah(totals.totalIncome)
+                    _totalOutcomeText.value = formatRupiah(totals.totalOutcome)
+                }
+            }
+        }
+        viewModelScope.launch {
+            balanceRepository.observeEvidence().collectLatest { ev ->
+                _balanceEvidenceUrl.value = ev?.url
+            }
+        }
+        viewModelScope.launch {
+            incomeRepository.ensureCached()
+            transactionRepository.ensureCached()
+        }
         loadTotalBalance()
         loadBalanceEvidence()
+        loadTotalIncome()
+        loadTotalOutcome()
     }
 
-    fun setUsername(name: String) {
-        _username.value = name
-    }
+    fun setUsername(name: String) { _username.value = name }
 
     fun loadTotalBalance() {
         viewModelScope.launch {
             try {
-                val body = balanceRepository.getTotalBalance()
-                val amount = body?.balance
-                _totalBalanceText.value = if (amount != null) {
-                    formatRupiah(amount.toLong())
-                } else {
-                    "-"
-                }
+                balanceRepository.refreshTotalBalance()
             } catch (_: Exception) {
-                _totalBalanceText.value = "-"
+                try { balanceRepository.recalcBalanceFromTotals() } catch (_: Exception) {}
             }
         }
     }
 
     fun loadBalanceEvidence() {
         viewModelScope.launch {
-            try {
-                val body = balanceRepository.getBalanceEvidence()
-                val url = body?.url
-                _balanceEvidenceUrl.value = url
-            } catch (_: Exception) {
-                _balanceEvidenceUrl.value = null
-            }
+            try { balanceRepository.refreshBalanceEvidence() } catch (_: Exception) {}
+        }
+    }
+
+    fun forceRefreshBalanceEvidence() {
+        viewModelScope.launch {
+            try { balanceRepository.refreshBalanceEvidence() } catch (_: Exception) {}
         }
     }
 
@@ -87,15 +100,10 @@ class DashboardViewModel(
         viewModelScope.launch {
             try {
                 val body = incomeRepository.getTotalIncome()
-                val amount = body?.totalIncome
-                _totalIncomeText.value = if (amount != null) {
-                    formatRupiah(amount.toLong())
-                } else {
-                    "-"
-                }
-            } catch (_: Exception) {
-                _totalIncomeText.value = "-"
-            }
+                val amount = body?.totalIncome ?: return@launch
+                balanceRepository.refreshTotalIncome(amount)
+                try { balanceRepository.recalcBalanceFromTotals() } catch (_: Exception) {}
+            } catch (_: Exception) {}
         }
     }
 
@@ -103,40 +111,52 @@ class DashboardViewModel(
         viewModelScope.launch {
             try {
                 val body = transactionRepository.getTotalOutcome()
-                val amount = body?.totalOutcome
-                _totalOutcomeText.value = if (amount != null) {
-                    formatRupiah(amount.toLong())
-                } else {
-                    "-"
-                }
-            } catch (_: Exception) {
-                _totalOutcomeText.value = "-"
-            }
+                val amount = body?.totalOutcome ?: return@launch
+                balanceRepository.refreshTotalOutcome(amount)
+                try { balanceRepository.recalcBalanceFromTotals() } catch (_: Exception) {}
+            } catch (_: Exception) {}
         }
     }
 
     suspend fun postIncome(name: String, nominal: Int, transferDate: String): Boolean {
         return try {
             incomeRepository.postIncome(nominal, name, transferDate)
-            loadTotalIncome()
-            loadTotalBalance()
+            incomeRepository.refreshIncomes()
+            transactionRepository.refreshTransactions()
+            val ti = incomeRepository.getTotalIncome()?.totalIncome
+            if (ti != null) balanceRepository.refreshTotalIncome(ti)
+            balanceRepository.refreshTotalBalance()
+            try { balanceRepository.recalcBalanceFromTotals() } catch (_: Exception) {}
             _refreshLists.tryEmit(Unit)
             true
-        } catch (_: Exception) {
-            false
-        }
+        } catch (_: Exception) { false }
     }
 
     suspend fun postTransaction(nominal: Int, notes: String): Boolean {
         return try {
             transactionRepository.postTransaction(nominal, notes)
-            loadTotalOutcome()
-            loadTotalBalance()
+            transactionRepository.refreshTransactions()
+            val to = transactionRepository.getTotalOutcome()?.totalOutcome
+            if (to != null) balanceRepository.refreshTotalOutcome(to)
+            balanceRepository.refreshTotalBalance()
+            try { balanceRepository.recalcBalanceFromTotals() } catch (_: Exception) {}
             _refreshLists.tryEmit(Unit)
             true
-        } catch (_: Exception) {
-            false
-        }
+        } catch (_: Exception) { false }
+    }
+
+    suspend fun refreshAll() {
+        try { incomeRepository.refreshIncomes() } catch (_: Exception) {}
+        try { transactionRepository.refreshTransactions() } catch (_: Exception) {}
+        try {
+            incomeRepository.getTotalIncome()?.totalIncome?.let { balanceRepository.refreshTotalIncome(it) }
+        } catch (_: Exception) {}
+        try {
+            transactionRepository.getTotalOutcome()?.totalOutcome?.let { balanceRepository.refreshTotalOutcome(it) }
+        } catch (_: Exception) {}
+        try { balanceRepository.refreshTotalBalance() } catch (_: Exception) { try { balanceRepository.recalcBalanceFromTotals() } catch (_: Exception) {} }
+        try { balanceRepository.refreshBalanceEvidence() } catch (_: Exception) {}
+        _refreshLists.tryEmit(Unit)
     }
 
     private fun formatRupiah(amount: Long): String {

@@ -380,6 +380,7 @@ private fun TransactionItem(
 @RequiresApi(Build.VERSION_CODES.O)
 private fun formatDateDdMMyyyy(raw: String?): String {
     if (raw.isNullOrBlank()) return "-"
+    if (raw.contains("8888") || raw == "01/01/8888") return "-"
     val out = DateTimeFormatter.ofPattern("dd/MM/yyyy")
     val candidates = listOf(
         DateTimeFormatter.ISO_OFFSET_DATE_TIME,
@@ -395,7 +396,6 @@ private fun formatDateDdMMyyyy(raw: String?): String {
                     val inst = Instant.parse(raw)
                     inst.atZone(ZoneId.systemDefault()).toLocalDate()
                 }
-
                 DateTimeFormatter.ISO_LOCAL_DATE -> LocalDate.parse(raw, fmt)
                 DateTimeFormatter.ISO_LOCAL_DATE_TIME,
                 DateTimeFormatter.ISO_OFFSET_DATE_TIME,
@@ -403,14 +403,15 @@ private fun formatDateDdMMyyyy(raw: String?): String {
                     val ldt = LocalDateTime.parse(raw, fmt)
                     ldt.toLocalDate()
                 }
-
                 else -> LocalDate.parse(raw, fmt)
             }
+            // Sanity check year range
+            if (date.year < 1970 || date.year > 2100 || date.year == 8888) return "-"
             return date.format(out)
         } catch (_: Exception) {
         }
     }
-    return raw
+    return "-"
 }
 
 private fun parseAmountToLong(value: String?): Long {

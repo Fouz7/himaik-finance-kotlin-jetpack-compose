@@ -20,6 +20,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Wallet
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -59,16 +60,18 @@ import kotlinx.coroutines.launch
 import kotlin.math.min
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.content.edit
+import com.example.himaikfinance.data.local.db.AppDatabase
 
 class DashboardActivity : ComponentActivity() {
 
     private val tokenManager: TokenManager by lazy { TokenManager(applicationContext) }
+    private val db: AppDatabase by lazy { AppDatabase.get(applicationContext) }
     private val vm: DashboardViewModel by viewModels {
         DashboardViewModelFactory(
             usernameProvider = { getUsername(applicationContext) },
-            balanceRepository = BalanceRepository(RetrofitClient.api),
-            incomeRepository = IncomeRepository(RetrofitClient.api, tokenManager),
-            transactionRepository = TransactionRepsitory(RetrofitClient.api, tokenManager)
+            balanceRepository = BalanceRepository(RetrofitClient.api, db.balanceDao()),
+            incomeRepository = IncomeRepository(RetrofitClient.api, tokenManager, db.incomeDao()),
+            transactionRepository = TransactionRepsitory(RetrofitClient.api, tokenManager, db.transactionDao())
         )
     }
     private val themeVm: ThemeViewModel by viewModels()
@@ -126,6 +129,7 @@ class DashboardActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DashboardScreen(
     vm: DashboardViewModel,
@@ -139,6 +143,8 @@ private fun DashboardScreen(
         vm.loadTotalIncome()
         vm.loadTotalOutcome()
     }
+    val scope = rememberCoroutineScope()
+    var isRefreshing by remember { mutableStateOf(false) }
     val items: List<Pair<ImageVector, String>> = listOf(
         Icons.Outlined.Home to "Income",
         Icons.Outlined.Wallet to "Evidence",
@@ -205,143 +211,157 @@ private fun DashboardScreen(
             )
         }
     ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentAlignment = Alignment.Center,
-        ) {
-            DashboardBody(
-                vm = vm,
-                selected = selected,
-                items = items,
-                username = username,
-                totalBalance = totalBalance,
-                totalIncome = totalIncome,
-                totalOutcome = totalOutcome,
-                evidenceUrl = evidenceUrl,
-                onRequestMenu = { action ->
-                    when (action) {
-                        MenuAction.Theme -> showThemeChooser = true
-                        MenuAction.Logout -> showLogoutConfirm = true
-                    }
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                scope.launch {
+                    isRefreshing = true
+                    vm.refreshAll()
+                    isRefreshing = false
                 }
-            )
-        }
-
-        when (activeDialog) {
-            "income" -> AddIncomeDialog(
-                onDismiss = { activeDialog = null },
-                vm = vm,
-                onDone = { requestDismiss() },
-                dismissSignal = dismissSignal,
-                pivotX = pivotX
-            )
-
-            "transaction" -> AddTransactionDialog(
-                onDismiss = { activeDialog = null },
-                vm = vm,
-                onDone = { requestDismiss() },
-                dismissSignal = dismissSignal,
-                pivotX = pivotX
-            )
-
-            "upload" -> UploadEvidenceDialog(
-                onDismiss = {
-                    vm.loadBalanceEvidence()
-                    activeDialog = null
-                },
-                tokenManager = tokenManager,
-                onUploaded = { requestDismiss() },
-                dismissSignal = dismissSignal,
-                pivotX = pivotX
-            )
-
-            "qr" -> QrDialog(
-                imageModel = qrImageModel(LocalContext.current),
-                onDismiss = { activeDialog = null },
-                dismissSignal = dismissSignal,
-                pivotX = pivotX
-            )
-        }
-
-        var selectedTheme by rememberSaveable { mutableStateOf(currentTheme) }
-        if (showThemeChooser) {
-            AlertDialog(
-                onDismissRequest = { showThemeChooser = false },
-                title = { Text("Select Theme", color = MaterialTheme.colorScheme.tertiary) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = selectedTheme == AppTheme.HIMAIK,
-                                onClick = { selectedTheme = AppTheme.HIMAIK },
-                                colors = RadioButtonDefaults.colors(
-                                    selectedColor = MaterialTheme.colorScheme.surface
-                                )
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text("HIMAIK", color = MaterialTheme.colorScheme.tertiary)
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = selectedTheme == AppTheme.BASIC,
-                                onClick = { selectedTheme = AppTheme.BASIC },
-                                colors = RadioButtonDefaults.colors(
-                                    selectedColor = MaterialTheme.colorScheme.surface
-                                )
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text("Basic", color = MaterialTheme.colorScheme.tertiary)
+            }
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.Center,
+            ) {
+                DashboardBody(
+                    vm = vm,
+                    selected = selected,
+                    items = items,
+                    username = username,
+                    totalBalance = totalBalance,
+                    totalIncome = totalIncome,
+                    totalOutcome = totalOutcome,
+                    evidenceUrl = evidenceUrl,
+                    onRequestMenu = { action ->
+                        when (action) {
+                            MenuAction.Theme -> showThemeChooser = true
+                            MenuAction.Logout -> showLogoutConfirm = true
                         }
                     }
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            onChangeTheme(selectedTheme)
-                            showThemeChooser = false
-                        },
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)
-                    ) { Text("Apply") }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = { showThemeChooser = false },
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)
-                    ) { Text("Cancel") }
-                },
-                containerColor = MaterialTheme.colorScheme.primary
-            )
-        }
+                )
+            }
 
-        if (showLogoutConfirm) {
-            AlertDialog(
-                onDismissRequest = { showLogoutConfirm = false },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showLogoutConfirm = false
-                            onLogout()
-                        },
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)
-                    ) { Text("Yes") }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = { showLogoutConfirm = false },
-                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)
-                    ) { Text("No") }
-                },
-                title = { Text("Confirm", color = MaterialTheme.colorScheme.tertiary) },
-                text = {
-                    Text(
-                        "Are you sure you want to logout?",
-                        color = MaterialTheme.colorScheme.tertiary
-                    )
-                },
-                containerColor = MaterialTheme.colorScheme.primary
-            )
+            when (activeDialog) {
+                "income" -> AddIncomeDialog(
+                    onDismiss = { activeDialog = null },
+                    vm = vm,
+                    onDone = { requestDismiss() },
+                    dismissSignal = dismissSignal,
+                    pivotX = pivotX
+                )
+
+                "transaction" -> AddTransactionDialog(
+                    onDismiss = { activeDialog = null },
+                    vm = vm,
+                    onDone = { requestDismiss() },
+                    dismissSignal = dismissSignal,
+                    pivotX = pivotX
+                )
+
+                "upload" -> UploadEvidenceDialog(
+                    onDismiss = {
+                        vm.loadBalanceEvidence()
+                        activeDialog = null
+                    },
+                    tokenManager = tokenManager,
+                    onUploaded = {
+                        vm.forceRefreshBalanceEvidence()
+                        requestDismiss()
+                    },
+                    dismissSignal = dismissSignal,
+                    pivotX = pivotX
+                )
+
+                "qr" -> QrDialog(
+                    imageModel = qrImageModel(LocalContext.current),
+                    onDismiss = { activeDialog = null },
+                    dismissSignal = dismissSignal,
+                    pivotX = pivotX
+                )
+            }
+
+            var selectedTheme by rememberSaveable { mutableStateOf(currentTheme) }
+            if (showThemeChooser) {
+                AlertDialog(
+                    onDismissRequest = { showThemeChooser = false },
+                    title = { Text("Select Theme", color = MaterialTheme.colorScheme.tertiary) },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(
+                                    selected = selectedTheme == AppTheme.HIMAIK,
+                                    onClick = { selectedTheme = AppTheme.HIMAIK },
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = MaterialTheme.colorScheme.surface
+                                    )
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text("HIMAIK", color = MaterialTheme.colorScheme.tertiary)
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(
+                                    selected = selectedTheme == AppTheme.BASIC,
+                                    onClick = { selectedTheme = AppTheme.BASIC },
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = MaterialTheme.colorScheme.surface
+                                    )
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text("Basic", color = MaterialTheme.colorScheme.tertiary)
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                onChangeTheme(selectedTheme)
+                                showThemeChooser = false
+                            },
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)
+                        ) { Text("Apply") }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = { showThemeChooser = false },
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)
+                        ) { Text("Cancel") }
+                    },
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            if (showLogoutConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showLogoutConfirm = false },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showLogoutConfirm = false
+                                onLogout()
+                            },
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)
+                        ) { Text("Yes") }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = { showLogoutConfirm = false },
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary)
+                        ) { Text("No") }
+                    },
+                    title = { Text("Confirm", color = MaterialTheme.colorScheme.tertiary) },
+                    text = {
+                        Text(
+                            "Are you sure you want to logout?",
+                            color = MaterialTheme.colorScheme.tertiary
+                        )
+                    },
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            }
         }
     }
 }
